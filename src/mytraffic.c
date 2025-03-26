@@ -80,6 +80,9 @@ static int mytraffic_open(struct inode *inode, struct file *file)
     return 0;
 }
 
+//set lights helper function
+static void set_lights(int red, int yellow, int green);
+
 // file operations structure
 
 struct file_operations fops = {
