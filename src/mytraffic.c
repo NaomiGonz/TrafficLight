@@ -9,13 +9,59 @@
 #include <linux/mutex.h>
 
 // define GPIO pins
-#define
+#define 
 
-// define operational modes - use enum?
-// e.g., 
-enum traffic_mode{}; 
-// and then 
-static enum traffic_mode current_mode = ...;
+
+// Structs and varibales to keep track of state
+typedef enum {
+	NORMAL,
+	FLASH_RED,
+	FLASH_YELLOW,
+} traffic_mode; 
+
+typedef enum {
+	GREEN,
+	YELLOW,
+	RED,
+} traffic_color; 
+
+// Node to keep normal mode state
+typedef struct node{
+	traffic_color color;
+	int cycle_len;
+} node;
+
+static bool ped_flag;
+static bool red_state;
+static bool yellow_state;
+
+static int cycle_rate;
+
+struct timer_list timer;
+
+// --------- BUTTON 1 inturrept ----------------
+/*
+- sets the cycle length longer for yellow and red (IN NORMAL MODE ONLY)
+- sets ped_flag to high 
+- NOTE: need to inverent the cycle length changes once hit green again and set ped_flag to low
+*/
+
+// --------- BUTTON 0 inturrept ----------------
+/*
+- switches mode 
+- if we have pointer set to green and make sure cycle length is default 
+-  yellow_state and red_state variables start with them on
+- if we have timer set, delete it (set new one)
+*/
+
+// -------- Function with Switch Statement (catch timer interupt) --------
+/*
+- called after every timer interrupt done
+- reset timer and puts current led on or off (based on state and mode)
+*/
+
+
+static traffic_mode current_mode;
 
 // init function
 static int __init traffic_init(void){}
@@ -30,21 +76,20 @@ static int __init traffic_init(void){}
 static int __exit traffic_exit(void){}
 // to set value: gpio_set_value(gpio, value)
 // to free: gpio_free(gpio)
+// free any memory to make linked list
 
-
-
-
-// function(s?) to handle interrupts
-
-// helper function to set light values? e.g. set_lights(0,1,1)
-
-// function to handle modes - can use switch case?
-// use kernel thread - easy to use, can just use msleep() for timing
-// you define the thread as a function, then call it in the init function using kthread_run()
 
 module_init(traffic_init);
 module_exit(traffic_exit);
 
-MODULE_LICENSE();
+MODULE_LICENSE("GPL");
 MODULE_AUTHOR();
 MODULE_DESCRIPTION();
+
+
+
+
+
+
+
+
