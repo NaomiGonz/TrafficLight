@@ -39,6 +39,8 @@ static int cycle_rate;
 
 struct timer_list timer;
 
+// Function Prototypes
+
 // --------- BUTTON 1 inturrept ----------------
 /*
 - sets the cycle length longer for yellow and red (IN NORMAL MODE ONLY)
@@ -60,6 +62,22 @@ struct timer_list timer;
 - reset timer and puts current led on or off (based on state and mode)
 */
 
+// read function
+static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
+
+// write function
+static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
+
+
+
+
+// file operations structure
+
+struct file_operations fops = {
+	.owner = THIS_MODULE;
+	.read = mytraffic_read,
+	.write = mytraffic_write,
+};
 
 static traffic_mode current_mode;
 
