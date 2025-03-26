@@ -31,6 +31,8 @@ typedef struct node{
 	int cycle_len;
 } node;
 
+static traffic_mode current_mode;
+
 static bool ped_flag;
 static bool red_state;
 static bool yellow_state;
@@ -68,8 +70,15 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 // write function
 static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
 
+static int mytraffic_release(struct inode *inode, struct file *file)
+{
+    return 0;
+}
 
-
+static int mytraffic_open(struct inode *inode, struct file *file)
+{
+    return 0;
+}
 
 // file operations structure
 
@@ -78,8 +87,6 @@ struct file_operations fops = {
 	.read = mytraffic_read,
 	.write = mytraffic_write,
 };
-
-static traffic_mode current_mode;
 
 // init function
 static int __init traffic_init(void){}
