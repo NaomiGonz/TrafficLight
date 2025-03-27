@@ -48,9 +48,19 @@ struct file_operations fops = {
 	.owner = THIS_MODULE;
 	.read = mytraffic_read,
 	.write = mytraffic_write,
+	.release = mytraffic_release,
+	.open = mytraffic_open,
 };
 
-// Function Prototypes
+// FUNCTION PROTOTYPES ------------------------------------
+
+static int __init mytraffic_init(void);
+static int __exit mytraffic_exit(void);
+static int mytraffic_release(struct inode *inode, struct file *file);
+static int mytraffic_open(struct inode *inode, struct file *file);
+static void set_lights(int red, int yellow, int green); // helper function to set lights
+
+
 
 // --------- BUTTON 1 inturrept ----------------
 /*
@@ -79,6 +89,10 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 // write function
 static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
 
+
+
+// FUNCTION IMPLEMENTATIONS ------------------------------------
+
 static int mytraffic_release(struct inode *inode, struct file *file)
 {
     return 0;
@@ -89,29 +103,84 @@ static int mytraffic_open(struct inode *inode, struct file *file)
     return 0;
 }
 
-//set lights helper function
-static void set_lights(int red, int yellow, int green);
+// set lights helper function
+// example usage: set_lights(1,0,0) would light up the red LED, and turn off the green and yellow LED
+static void set_lights(int red, int yellow, int green){
+	if((red != 0 | red != 1) | (yellow != 0 | yellow != 1) (green != 0 | green != 1)){
+		printk("invalid values for set_lights");
+		return -EINVAL;
+	}
 
-// file operations structure
+	gpio_set_value(GPIO_RED,red);
+	gpio_set_value(GPIO_YELLOW,yellow);
+	gpio_set_value(GPIO_GREEN,green);
+}
 
 // init function
-static int __init traffic_init(void){}
-// configure LEDs and buttons using gpio_request
-// to set as output: gpio_direction_output(gpio, value)
-// to set as an input: gpio_direction_input(gpio
+static int __init mytraffic_init(void){
 
-// configure interrupt requests for buttons
-// gpio_to_irq(), request_irq()
+	int retcheck;
+
+	// initialize LED gpio pins
+
+	retcheck = gpio_request(GPIO_GREEN, "green_led");
+	if(retcheck) goto green_fail;
+	gpio_direction_output(GPIO_GREEN,0);
+
+	retcheck = gpio_request(GPIO_YELLOW, "yellow_led");
+	if(retcheck) goto yellow_fail;
+	gpio_direction_output(GPIO_YELLOW,0);
+
+	retcheck = gpio_request(GPIO_RED, "red_led");
+	if(retcheck) goto red_fail;
+	gpio_direction_output(GPIO_RED,0);
+
+	// initialized button gpio pins
+
+	retcheck = gpio_request(GPIO_BTN0, "btn0");
+	if(retcheck) goto btn0_fail;
+	gpio_direction_input(GPIO_BTN0);
+
+	retcheck = gpio_request(GPIO_BTN1, "btn1");
+	if(retcheck) goto btn1_fail;
+	gpio_direction_input(GPIO_BTN1);
+
+	// initialize states
+
+
+
+	// initialization failure handling
+
+	green_fail:
+		gpio_free(GPIO_GREEN);
+	yellow_fail:
+		gpio_free(GPIO_YELLOW);
+	red_fail:
+		gpio_free(GPIO_RED);
+	btn0_fail:
+		gpio_free(GPIO_BTN0);
+	btn1_fail:
+		gpio_free(BTN1);
+
+}
+
 
 // exit function
-static int __exit traffic_exit(void){}
+static int __exit mytraffic_exit(void){
+	set_lights(0,0,0);
+	gpio_free(GPIO_BTN0);
+	gpio_free(GPIO_BTN1);
+	gpio_free(GPIO_GREEN);
+	gpio_free(GPIO_YELLOW);
+	gpio_free(GPIO_RED);
+}
 // to set value: gpio_set_value(gpio, value)
 // to free: gpio_free(gpio)
 // free any memory to make linked list
 
 
-module_init(traffic_init);
-module_exit(traffic_exit);
+module_init(mytraffic_init);
+module_exit(mytraffic_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR();
