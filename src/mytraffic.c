@@ -9,8 +9,11 @@
 #include <linux/mutex.h>
 
 // define GPIO pins
-#define 
-
+#define GPIO_RED		67
+#define GPIO_YELLOW		68
+#define GPIO_GREEN		44
+#define GPIO_BTN0		26
+#define GPIO_BTN1		46
 
 // Structs and varibales to keep track of state
 typedef enum {
@@ -40,6 +43,12 @@ static bool yellow_state;
 static int cycle_rate;
 
 struct timer_list timer;
+
+struct file_operations fops = {
+	.owner = THIS_MODULE;
+	.read = mytraffic_read,
+	.write = mytraffic_write,
+};
 
 // Function Prototypes
 
@@ -84,12 +93,6 @@ static int mytraffic_open(struct inode *inode, struct file *file)
 static void set_lights(int red, int yellow, int green);
 
 // file operations structure
-
-struct file_operations fops = {
-	.owner = THIS_MODULE;
-	.read = mytraffic_read,
-	.write = mytraffic_write,
-};
 
 // init function
 static int __init traffic_init(void){}
