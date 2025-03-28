@@ -39,6 +39,7 @@ static traffic_mode current_mode;
 static bool ped_flag;
 static bool red_state;
 static bool yellow_state;
+static int normal_index;
 
 static int cycle_rate;
 
@@ -146,7 +147,9 @@ static int __init mytraffic_init(void){
 	gpio_direction_input(GPIO_BTN1);
 
 	// initialize states
-
+	// set the default cycle time
+	// Create an array of "node"s and initialize the values (color and cycle length) and set the index to be 0 (aka point to the green) 
+	// set the green light to be on and set a timer for correct number of cycles
 
 
 	// initialization failure handling
@@ -176,7 +179,8 @@ static int __exit mytraffic_exit(void){
 }
 // to set value: gpio_set_value(gpio, value)
 // to free: gpio_free(gpio)
-// free any memory to make linked list
+// free any memory 
+// delete timer 
 
 
 module_init(mytraffic_init);
