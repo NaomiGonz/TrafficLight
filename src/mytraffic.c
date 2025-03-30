@@ -23,23 +23,18 @@ typedef enum {
 } traffic_mode; 
 
 typedef enum {
-	GREEN,
-	YELLOW,
-	RED,
+	GREEN = 0,
+	YELLOW = 1,
+	RED = 2,
 } traffic_color; 
-
-// Node to keep normal mode state
-typedef struct node{
-	traffic_color color;
-	int cycle_len;
-} node;
 
 static traffic_mode current_mode;
 
 static bool ped_flag;
 static bool red_state;
 static bool yellow_state;
-static int normal_index;
+static int normal_color;	// current color 
+static int norm_len[3] = {3, 1, 2}; // cycle length in normal mode {green, yellow, red}
 
 static int cycle_rate;
 
@@ -60,8 +55,11 @@ static int __exit mytraffic_exit(void);
 static int mytraffic_release(struct inode *inode, struct file *file);
 static int mytraffic_open(struct inode *inode, struct file *file);
 static void set_lights(int red, int yellow, int green); // helper function to set lights
+static void sw_mode(struct timer_list *t);
+static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
+static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
 
-
+// FUNCTION IMPLEMENTATIONS ------------------------------------
 
 // --------- BUTTON 1 inturrept ----------------
 /*
@@ -78,21 +76,70 @@ static void set_lights(int red, int yellow, int green); // helper function to se
 - if we have timer set, delete it (set new one)
 */
 
-// -------- Function with Switch Statement (catch timer interupt) --------
-/*
-- called after every timer interrupt done
-- reset timer and puts current led on or off (based on state and mode)
-*/
+// Function that runs when timer expires
+void sw_mode(struct timer_list *t){
+	unsigned long new_time;
+
+	// Move to next state based on what mode the device is in
+	switch (current_mode) {
+
+	case NORMAL:
+		normal_color = (normal_color < 2) ? (normal_color + 1) : GREEN;
+
+		// Turn on next LED
+		switch (normal_color) {
+		case GREEN:
+			set_lights(0, 0, 1);
+			break;
+		case YELLOW:
+			set_lights(0, 1, 0);
+			break;
+		case RED:
+			set_lights(1, 0, 0);
+			break;
+		}
+
+		// Calculate timer expiration time 
+		new_time = jiffies + norm_len[normal_color] * (HZ / cycle_rate);
+		break;
+
+	case FLASH_RED:
+		// toggle LED
+		red_state = !red_state;
+		set_lights(red_state, 0, 0);
+
+		// Calculate timer expiration time 
+		new_time = jiffies + (HZ / cycle_rate);
+		break;
+
+	case FLASH_YELLOW:
+		// toggle LED
+		yellow_state = !yellow_state;
+		set_lights(0, yellow_state, 0);
+
+		// Calculate timer expiration time 
+		new_time = jiffies + (HZ / cycle_rate);
+		break;
+
+	default:
+		printk(KERN_ALERT "ERROR: unknown mode\n");
+	}
+
+	// Start the new timer
+	mod_timer(&timer, new_time);
+
+}
 
 // read function
-static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
+static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset){
+
+}
 
 // write function
-static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
+static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset){
+	
+}
 
-
-
-// FUNCTION IMPLEMENTATIONS ------------------------------------
 
 static int mytraffic_release(struct inode *inode, struct file *file)
 {
@@ -147,9 +194,10 @@ static int __init mytraffic_init(void){
 	gpio_direction_input(GPIO_BTN1);
 
 	// initialize states
-	// set the default cycle time
-	// Create an array of "node"s and initialize the values (color and cycle length) and set the index to be 0 (aka point to the green) 
-	// set the green light to be on and set a timer for correct number of cycles
+	// set the default cycle rate of 1
+	// set normal_color to GREEN
+	// set the green LED to be on
+	// set a timer for correct number of cycles (timer_setup and mod_timer)
 
 
 	// initialization failure handling
