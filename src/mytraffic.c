@@ -99,6 +99,8 @@ static void update_mode_on_buttons(void){
 			normal_color = GREEN;
 			set_lights(0, 0, 1);
 			mod_timer(&timer, jiffies + norm_len[GREEN] * (HZ / cycle_rate));
+			button1_pressed = gpio_get_value(GPIO_BTN1);
+			button0_pressed = gpio_get_value(GPIO_BTN0);
 		}
 		
 	}
@@ -127,6 +129,8 @@ static irqreturn_t button1_isr(int irq, void *dev_id){
 
         	ped_flag = true;
     	}
+
+    	button1_pressed = gpio_get_value(GPIO_BTN1);
     }
 
     spin_unlock_irqrestore(&lock, flags);
@@ -202,7 +206,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
                 new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
                 break;
             }
-
+            button0_pressed = gpio_get_value(GPIO_BTN0);
             // Start timer again with new time
             mod_timer(&timer, new_time);
     	}
@@ -276,6 +280,14 @@ void sw_mode(struct timer_list *t){
 		break;
 	default:
 		printk(KERN_ALERT "ERROR: unknown mode\n");
+		// fallback
+        current_mode = NORMAL;
+        norm_len[GREEN]  = 3;
+        norm_len[YELLOW] = 1;
+        norm_len[RED]    = 2;
+        ped_flag = false;
+        set_lights(0, 0, 1);
+        new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
 	}
 	
 	// Start the new timer
