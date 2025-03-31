@@ -40,6 +40,8 @@ static int cycle_rate;
 
 struct timer_list timer;
 
+static spinlock_t lock;
+
 struct file_operations fops = {
 	.owner = THIS_MODULE;
 	.read = mytraffic_read,
@@ -62,24 +64,95 @@ static ssize_t mytraffic_write(struct file *file, const char __user *buffer, siz
 // FUNCTION IMPLEMENTATIONS ------------------------------------
 
 // --------- BUTTON 1 inturrept ----------------
-/*
-- sets the cycle length longer for yellow and red (IN NORMAL MODE ONLY)
-- sets ped_flag to high 
-- NOTE: need to inverent the cycle length changes once hit green again and set ped_flag to low
-*/
+static irqreturn_t button1_isr(int irq, void *dev_id)
+{
+    unsigned long flags;
+
+
+    spin_lock_irqsave(&lock, flags);
+
+    // Increase the cycle length for YELLOW and RED if Normal mode
+    if (current_mode == NORMAL) {
+        norm_len[YELLOW] = 5; 
+        norm_len[RED]    = 5; 
+
+        ped_flag = true;
+    }
+
+    spin_unlock_irqrestore(&lock, flags);
+
+    return IRQ_HANDLED;
+}
+
 
 // --------- BUTTON 0 inturrept ----------------
-/*
-- switches mode 
-- if we have pointer set to green and make sure cycle length is default 
--  yellow_state and red_state variables start with them on
-- if we have timer set, delete it (set new one)
-*/
+static irqreturn_t button0_isr(int irq, void *dev_id)
+{
+    unsigned long flags;
+    unsigned long new_time;
+
+    spin_lock_irqsave(&my_lock, flags);
+
+    // Delete existing timer
+    del_timer(&timer);
+
+    // Cycle mode
+    switch (current_mode) {
+
+    case NORMAL:
+    	// Change to Flash-Red Mode
+        current_mode = FLASH_RED;
+
+        // Turn on LED and calculate new time
+        red_state = true;
+        set_lights(red_state, 0, 0);
+        new_time = jiffies + (HZ / cycle_rate);
+        break;
+
+    case FLASH_RED:
+    	// Change to Flash-Yellow Mode
+        current_mode = FLASH_YELLOW;
+
+        // Turn on LED and calculate new time
+        yellow_state = true;
+        set_lights(0, yellow_state, 0);
+        new_time = jiffies + (HZ / cycle_rate);
+        break;
+
+    case FLASH_YELLOW:
+    	// Change to normal mode and reset values
+        current_mode = NORMAL;
+        norm_len[GREEN]  = 3; 
+        norm_len[YELLOW] = 1;
+        norm_len[RED]    = 2;
+        ped_flag = false;
+
+        // Turn on green LED
+        normal_color = GREEN;
+        set_lights(0, 0, 1);
+
+        // calculate new time
+        new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
+        break;
+    default:
+        printk(KERN_ALERT "ERROR: button0 can't change modes\n")
+    }
+
+    // Start timer again with new time
+    mod_timer(&timer, new_time);
+    spin_unlock_irqrestore(&my_lock, flags);
+
+    return IRQ_HANDLED;
+}
+
+
 
 // Function that runs when timer expires
 void sw_mode(struct timer_list *t){
 	unsigned long new_time;
+	unsigned long flags;
 
+	spin_lock_irqsave(&lock, flags);
 	// Move to next state based on what mode the device is in
 	switch (current_mode) {
 
@@ -90,6 +163,11 @@ void sw_mode(struct timer_list *t){
 		switch (normal_color) {
 		case GREEN:
 			set_lights(0, 0, 1);
+
+			if (ped_flag) {
+				norm_len[YELLOW] = 1;
+				norm_len[RED]    = 2;
+				ped_flag = false;
 			break;
 		case YELLOW:
 			set_lights(0, 1, 0);
@@ -127,6 +205,7 @@ void sw_mode(struct timer_list *t){
 
 	// Start the new timer
 	mod_timer(&timer, new_time);
+	spin_unlock_irqrestore(&lock, flags);
 
 }
 
@@ -194,6 +273,7 @@ static int __init mytraffic_init(void){
 	gpio_direction_input(GPIO_BTN1);
 
 	// initialize states
+	spin_lock_init(&lock);
 	// set the default cycle rate of 1
 	// set normal_color to GREEN
 	// set the green LED to be on
