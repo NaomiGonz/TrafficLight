@@ -299,9 +299,11 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 	written += snprintf(kbuf + written, sizeof(kbuf) - written,
 			"Mode: %s\n", mode_to_str(current_mode));
 
+	// cycle rate
 	written += snprintf(kbuf + written, sizeof(kbuf) - written,
 			"Cycle rate: %d\n", cycle_rate);
 
+	// LED status
 	written += snprintf(kbuf + written, sizeof(kbuf) - written,
 			"Light status: Red %s, Yellow %s, Green %s\n",
 			gpio_get_value(GPIO_RED) ? "on" : "off",
@@ -309,6 +311,7 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 			gpio_get_value(GPIO_GREEN) ? "on" : "off"
 		);
 
+	// pedestrian waiting?
 	if(ped_flag) {
 		written += snprintf(kbuf + written, sizeof(kbuf) - written,
 				"Pedestrian: Present\n");
@@ -327,7 +330,27 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 
 // write function
 static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset){
-	
+	char kbuf[10];
+	int new_rate;
+
+	copy_from_user(kbuf, buffer, len)
+
+	kbuf[len] = '\0'; // null terminate user input string
+
+	if(kstrtoint(kbuf, 10, &new_rate) == 0){
+		if(new_rate >= 1 && new_rate <= 9){
+			unsigned long flag;
+			spin_lock_irqsave(&lock, flag);
+			cycle_rate = new_rate;
+			spin_unlock_irqrestore(&lock, flag);
+		} else {
+			printk(KERN_ERR "invalid new cycle rate\n");
+		}
+	} else {
+		printk(KERN_ERR "invalid new cycle rate\n");
+	}
+
+	return len;
 }
 
 
