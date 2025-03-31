@@ -273,9 +273,56 @@ void sw_mode(struct timer_list *t){
 
 }
 
+// helper function for read functionality (converts mode to a string)
+static const char* mode_to_str(traffic_mode mode){
+	switch(mode) {
+		case NORMAL: return "Normal";
+		case FLASH_RED: return "Flashing-red";
+		case FLASH_YELLOW: "Flashing-yellow";
+		default: return "unknown state";
+	}
+}
+
 // read function
 static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset){
+	char kbuf[128];
+	int written = 0;
 
+	// limit reding to avoid infinite reads
+	if(*offset > 0) return 0;
+
+	spin_lock(&lock);
+
+	// format and generate output
+
+	//mode
+	written += snprintf(kbuf + written, sizeof(kbuf) - written,
+			"Mode: %s\n", mode_to_str(current_mode));
+
+	written += snprintf(kbuf + written, sizeof(kbuf) - written,
+			"Cycle rate: %d\n", cycle_rate);
+
+	written += snprintf(kbuf + written, sizeof(kbuf) - written,
+			"Light status: Red %s, Yellow %s, Green %s\n",
+			gpio_get_value(GPIO_RED) ? "on" : "off",
+			gpio_get_value(GPIO_YELLOW) ? "on" : "off",
+			gpio_get_value(GPIO_GREEN) ? "on" : "off"
+		);
+
+	if(ped_flag) {
+		written += snprintf(kbuf + written, sizeof(kbuf) - written,
+				"Pedestrian: Present\n");
+	} else {
+		written += snprintf(kbuf + written, sizeof(kbuf) - written,
+				"Pedestrian: Not present\n");
+	}
+
+	spin_unlock(&lock);
+
+	copy_to_user(buffer, kbuf, written);
+
+	*offset += written;
+	return written;
 }
 
 // write function
