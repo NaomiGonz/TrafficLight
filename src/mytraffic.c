@@ -78,6 +78,12 @@ struct file_operations fops = {
 
 // Function to check if both buttons are pressed
 static void update_mode_on_buttons(void){
+	bool btn0_stat = (gpio_get_value(GPIO_BTN0) == 0);
+	bool btn1_stat = (gpio_get_value(GPIO_BTN1) == 0);
+
+	button0_pressed = btn0_stat;
+	button1_pressed = btn1_stat;
+
 	if (button0_pressed && button1_pressed){
 		// delete timer and turn on all LEDs
 		del_timer(&timer);
