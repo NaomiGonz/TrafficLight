@@ -55,7 +55,7 @@ static spinlock_t lock;
 // FUNCTION PROTOTYPES ------------------------------------
 
 static int __init mytraffic_init(void);
-static int __exit mytraffic_exit(void);
+static void __exit mytraffic_exit(void);
 static int mytraffic_release(struct inode *inode, struct file *file);
 static int mytraffic_open(struct inode *inode, struct file *file);
 static void set_lights(int red, int yellow, int green); // helper function to set lights
