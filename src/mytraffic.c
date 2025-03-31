@@ -75,7 +75,7 @@ static void update_mode_on_buttons(void){
 		del_timer(&timer);
 		current_mode = ALL_ON;
 		set_lights(1, 1, 1);
-	else{
+	} else {
 		// Restart to normal mode if previously had all lights on
 		if (current_mode == ALL_ON){
 			current_mode = NORMAL;
@@ -136,7 +136,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
     // check if button still pressed
     new_state = (gpio_get_value(GPIO_BTN0) == 0);
 
-    spin_lock_irqsave(&my_lock, flags);
+    spin_lock_irqsave(&lock, flags);
 
     // Check if both buttons are pressed
     bool old_state = button0_pressed;
@@ -198,7 +198,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
             mod_timer(&timer, new_time);
     	}
     }
-    spin_unlock_irqrestore(&my_lock, flags);
+    spin_unlock_irqrestore(&lock, flags);
 
     return IRQ_HANDLED;
 }
@@ -297,9 +297,9 @@ static int mytraffic_open(struct inode *inode, struct file *file)
 // set lights helper function
 // example usage: set_lights(1,0,0) would light up the red LED, and turn off the green and yellow LED
 static void set_lights(int red, int yellow, int green){
-	if((red != 0 | red != 1) | (yellow != 0 | yellow != 1) (green != 0 | green != 1)){
-		printk("invalid values for set_lights");
-		return -EINVAL;
+	if((red != 0 && red != 1) || (yellow != 0 && yellow != 1) || (green != 0 && green != 1)){
+		printk(KERN_ERR "invalid values for set_lights\n");
+		return;
 	}
 
 	gpio_set_value(GPIO_RED,red);
@@ -311,6 +311,13 @@ static void set_lights(int red, int yellow, int green){
 static int __init mytraffic_init(void){
 
 	int retcheck;
+
+	// register device
+	retcheck = register_chrdev(61, "mytraffic", &fops);
+	if(retcheck < 0){
+		printk(KERN_ALERT "failed to register character device\n");
+		return -1;
+	}
 
 	// initialize LED gpio pins
 
@@ -336,38 +343,112 @@ static int __init mytraffic_init(void){
 	if(retcheck) goto btn1_fail;
 	gpio_direction_input(GPIO_BTN1);
 
-	// initialize states
+	// init lock	
 	spin_lock_init(&lock);
-	// set the default cycle rate of 1
-	// set normal_color to GREEN
-	// set the green LED to be on
-	// set a timer for correct number of cycles (timer_setup and mod_timer)
+	
+	// initialize interrupt requests
+	retcheck = request_irq(gpio_to_irq(GPIO_BTN0), button0_isr, 
+			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "btn0", NULL);
+	if (retcheck) {
+		printk(KERN_ERR "Failed to register IRQ for BTN0\n");
+		goto irq_fail;
+	}
 
+	retcheck = request_irq(gpio_to_irq(GPIO_BTN1), button1_isr, 
+			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "btn1", NULL);
+	if (retcheck) {
+		printk(KERN_ERR "Failed to register IRQ for BTN1\n");
+		free_irq(gpio_to_irq(GPIO_BTN0), NULL);
+		goto irq_fail;
+	}
+
+	// set the default cycle rate of 1
+	cycle_rate = 1;
+
+	// set normal_color to GREEN and mode to NORMAL
+	normal_color = GREEN;
+	current_mode = NORMAL;
+
+	// Set other states/flags to false
+	ped_flag = false;
+	red_state = false;
+	yellow_state = false;
+	button0_pressed = false;
+	button1_pressed = false;
+
+	// set the green LED to be on
+	set_lights(0,0,1);
+
+	// set a timer for correct number of cycles (timer_setup and mod_timer)
+	timer_setup(&timer, sw_mode, 0);
+	mod_timer(&timer, jiffies + norm_len[GREEN] * (HZ / cycle_rate));
+
+	return 0;
 
 	// initialization failure handling
 
 	green_fail:
+		printk(KERN_ERR "Green LED failed to initialize\n");
 		gpio_free(GPIO_GREEN);
+		return -1;
 	yellow_fail:
+		printk(KERN_ERR "Yellow LED failed to initialize\n");
 		gpio_free(GPIO_YELLOW);
+		gpio_free(GPIO_GREEN);
+		return -1;
 	red_fail:
+		printk(KERN_ERR "Red LED failed to initialize\n");
 		gpio_free(GPIO_RED);
+		gpio_free(GPIO_YELLOW);
+		gpio_free(GPIO_GREEN);
+		return -1;
 	btn0_fail:
+		printk(KERN_ERR "Btn 0 failed to initialize\n");
 		gpio_free(GPIO_BTN0);
+		gpio_free(GPIO_RED);
+		gpio_free(GPIO_YELLOW);
+		gpio_free(GPIO_GREEN);
+		return -1;
 	btn1_fail:
-		gpio_free(BTN1);
-
+		printk(KERN_ERR "Btn 1 failed to initialize\n");
+		gpio_free(GPIO_BTN1);
+		gpio_free(GPIO_BTN0);
+		gpio_free(GPIO_RED);
+		gpio_free(GPIO_YELLOW);
+		gpio_free(GPIO_GREEN);
+		return -1;
+	irq_fail:
+		gpio_free(GPIO_BTN1);
+		gpio_free(GPIO_BTN0);
+		gpio_free(GPIO_RED);
+		gpio_free(GPIO_YELLOW);
+		gpio_free(GPIO_GREEN);
+		free_irq(gpio_to_irq(GPIO_BTN0), NULL);
+		return -1;
 }
 
 
 // exit function
-static int __exit mytraffic_exit(void){
+static void __exit mytraffic_exit(void){
+
+	//turn off all lights
 	set_lights(0,0,0);
+
+	// delete timer
+	del_timer_sync(&timer);
+
+	// free GPIO devices
 	gpio_free(GPIO_BTN0);
 	gpio_free(GPIO_BTN1);
 	gpio_free(GPIO_GREEN);
 	gpio_free(GPIO_YELLOW);
 	gpio_free(GPIO_RED);
+
+	free_irq(gpio_to_irq(GPIO_BTN0), NULL);
+	free_irq(gpio_to_irq(GPIO_BTN1), NULL);
+
+	//unregister character device
+	unregister_chrdev(61,"mytraffic");
 }
 // to set value: gpio_set_value(gpio, value)
 // to free: gpio_free(gpio)
@@ -379,8 +460,8 @@ module_init(mytraffic_init);
 module_exit(mytraffic_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR();
-MODULE_DESCRIPTION();
+MODULE_AUTHOR("Naomi Gonzales, Gidon Gautel");
+MODULE_DESCRIPTION("traffic light controller");
 
 
 
