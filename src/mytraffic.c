@@ -20,6 +20,7 @@ typedef enum {
 	NORMAL,
 	FLASH_RED,
 	FLASH_YELLOW,
+	ALL_ON
 } traffic_mode; 
 
 typedef enum {
@@ -35,6 +36,9 @@ static bool red_state;
 static bool yellow_state;
 static int normal_color;	// current color 
 static int norm_len[3] = {3, 1, 2}; // cycle length in normal mode {green, yellow, red}
+
+static bool button0_pressed = false;
+static bool button1_pressed = false;
 
 static int cycle_rate;
 
@@ -60,23 +64,61 @@ static void set_lights(int red, int yellow, int green); // helper function to se
 static void sw_mode(struct timer_list *t);
 static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
 static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
+static void update_mode_on_buttons(void);
 
 // FUNCTION IMPLEMENTATIONS ------------------------------------
 
-// --------- BUTTON 1 inturrept ----------------
-static irqreturn_t button1_isr(int irq, void *dev_id)
-{
-    unsigned long flags;
+// Function to check if both buttons are pressed
+static void update_mode_on_buttons(void){
+	if (button0_pressed && button1_pressed){
+		// delete timer and turn on all LEDs
+		del_timer(&timer);
+		current_mode = ALL_ON;
+		set_lights(1, 1, 1);
+	else{
+		// Restart to normal mode if previously had all lights on
+		if (current_mode == ALL_ON){
+			current_mode = NORMAL;
 
+			// return to default values
+			norm_len[GREEN]  = 3; 
+            norm_len[YELLOW] = 1;
+            norm_len[RED]    = 2;
+            ped_flag = false;
+			cycle_rate = 1;
+
+			// Turn on Green LED and start timer
+			normal_color = GREEN;
+			set_lights(0, 0, 1);
+			mod_timer(&timer, jiffies + norm_len[GREEN] * (HZ / cycle_rate));
+		}
+		
+	}
+}
+
+
+// --------- BUTTON 1 inturrept ----------------
+static irqreturn_t button1_isr(int irq, void *dev_id){
+    unsigned long flags;
+    bool new_state;
+
+    // check if button still pressed
+    new_state = (gpio_get_value(GPIO_BTN1) == 0);
 
     spin_lock_irqsave(&lock, flags);
 
-    // Increase the cycle length for YELLOW and RED if Normal mode
-    if (current_mode == NORMAL) {
-        norm_len[YELLOW] = 5; 
-        norm_len[RED]    = 5; 
+    // check if both buttons are pressed
+    button1_pressed = new_state;
+    update_mode_on_buttons();
 
-        ped_flag = true;
+    if (current_mode != ALL_ON){
+    	// Increase the cycle length for YELLOW and RED if Normal mode
+    	if (current_mode == NORMAL) {
+        	norm_len[YELLOW] = 5; 
+        	norm_len[RED]    = 5; 
+
+        	ped_flag = true;
+    	}
     }
 
     spin_unlock_irqrestore(&lock, flags);
@@ -86,60 +128,76 @@ static irqreturn_t button1_isr(int irq, void *dev_id)
 
 
 // --------- BUTTON 0 inturrept ----------------
-static irqreturn_t button0_isr(int irq, void *dev_id)
-{
+static irqreturn_t button0_isr(int irq, void *dev_id){
     unsigned long flags;
     unsigned long new_time;
+    bool new_state;
+
+    // check if button still pressed
+    new_state = (gpio_get_value(GPIO_BTN0) == 0);
 
     spin_lock_irqsave(&my_lock, flags);
 
-    // Delete existing timer
-    del_timer(&timer);
+    // Check if both buttons are pressed
+    bool old_state = button0_pressed;
+    button0_pressed = new_state;
+    update_mode_on_buttons();
 
-    // Cycle mode
-    switch (current_mode) {
+    // If single press button 0
+    if (current_mode != ALL_ON){
+    	if (!old_state && new_state){
 
-    case NORMAL:
-    	// Change to Flash-Red Mode
-        current_mode = FLASH_RED;
+    		// Delete existing timer
+    		del_timer(&timer);
 
-        // Turn on LED and calculate new time
-        red_state = true;
-        set_lights(red_state, 0, 0);
-        new_time = jiffies + (HZ / cycle_rate);
-        break;
+    		switch (current_mode) {
+            case NORMAL:
+                // Change to Flash-Red Mode
+                current_mode = FLASH_RED;
+                red_state = true;
+                set_lights(red_state, 0, 0);
+                new_time = jiffies + (HZ / cycle_rate);
+                break;
 
-    case FLASH_RED:
-    	// Change to Flash-Yellow Mode
-        current_mode = FLASH_YELLOW;
+            case FLASH_RED:
+                // Change to Flash-Yellow Mode
+                current_mode = FLASH_YELLOW;
+                yellow_state = true;
+                set_lights(0, yellow_state, 0);
+                new_time = jiffies + (HZ / cycle_rate);
+                break;
 
-        // Turn on LED and calculate new time
-        yellow_state = true;
-        set_lights(0, yellow_state, 0);
-        new_time = jiffies + (HZ / cycle_rate);
-        break;
+            case FLASH_YELLOW:
+                // Change to normal mode and reset values
+                current_mode = NORMAL;
+                norm_len[GREEN]  = 3; 
+                norm_len[YELLOW] = 1;
+                norm_len[RED]    = 2;
+                ped_flag = false;
 
-    case FLASH_YELLOW:
-    	// Change to normal mode and reset values
-        current_mode = NORMAL;
-        norm_len[GREEN]  = 3; 
-        norm_len[YELLOW] = 1;
-        norm_len[RED]    = 2;
-        ped_flag = false;
+                normal_color = GREEN;
+                set_lights(0, 0, 1);
 
-        // Turn on green LED
-        normal_color = GREEN;
-        set_lights(0, 0, 1);
+                new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
+                break;
 
-        // calculate new time
-        new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
-        break;
-    default:
-        printk(KERN_ALERT "ERROR: button0 can't change modes\n")
+            default:
+                printk(KERN_ALERT "ERROR: button0 can't change modes\n");
+                // fallback
+                current_mode = NORMAL;
+                norm_len[GREEN]  = 3;
+                norm_len[YELLOW] = 1;
+                norm_len[RED]    = 2;
+                ped_flag = false;
+                set_lights(0, 0, 1);
+                new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
+                break;
+            }
+
+            // Start timer again with new time
+            mod_timer(&timer, new_time);
+    	}
     }
-
-    // Start timer again with new time
-    mod_timer(&timer, new_time);
     spin_unlock_irqrestore(&my_lock, flags);
 
     return IRQ_HANDLED;
@@ -199,6 +257,12 @@ void sw_mode(struct timer_list *t){
 		new_time = jiffies + (HZ / cycle_rate);
 		break;
 
+	case ALL_ON:
+		// Make sure all lights up, set up arbitrary timer amount 
+		// (timer will be changed once button is released)
+		set_lights(1, 1, 1);
+		new_time = jiffies + (HZ * 5);
+		break;
 	default:
 		printk(KERN_ALERT "ERROR: unknown mode\n");
 	}
