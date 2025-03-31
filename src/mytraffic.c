@@ -7,6 +7,12 @@
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
+#include <linux/kernel.h>
+#include <linux/spinlock.h>
+#include <linux/jiffies.h>
+#include <linux/timer.h>
+#include <linux/uaccess.h>
+
 
 // define GPIO pins
 #define GPIO_RED		67
@@ -46,14 +52,6 @@ struct timer_list timer;
 
 static spinlock_t lock;
 
-struct file_operations fops = {
-	.owner = THIS_MODULE;
-	.read = mytraffic_read,
-	.write = mytraffic_write,
-	.release = mytraffic_release,
-	.open = mytraffic_open,
-};
-
 // FUNCTION PROTOTYPES ------------------------------------
 
 static int __init mytraffic_init(void);
@@ -65,6 +63,16 @@ static void sw_mode(struct timer_list *t);
 static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len, loff_t *offset);
 static ssize_t mytraffic_write(struct file *file, const char __user *buffer, size_t len, loff_t *offset);
 static void update_mode_on_buttons(void);
+
+
+struct file_operations fops = {
+	.owner = THIS_MODULE,
+	.read = mytraffic_read,
+	.write = mytraffic_write,
+	.release = mytraffic_release,
+	.open = mytraffic_open,
+};
+
 
 // FUNCTION IMPLEMENTATIONS ------------------------------------
 
@@ -132,6 +140,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
     unsigned long flags;
     unsigned long new_time;
     bool new_state;
+    bool old_state;
 
     // check if button still pressed
     new_state = (gpio_get_value(GPIO_BTN0) == 0);
@@ -139,7 +148,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
     spin_lock_irqsave(&lock, flags);
 
     // Check if both buttons are pressed
-    bool old_state = button0_pressed;
+    old_state = button0_pressed;
     button0_pressed = new_state;
     update_mode_on_buttons();
 
@@ -214,7 +223,7 @@ void sw_mode(struct timer_list *t){
 	// Move to next state based on what mode the device is in
 	switch (current_mode) {
 
-	case NORMAL:
+	case NORMAL: {
 		normal_color = (normal_color < 2) ? (normal_color + 1) : GREEN;
 
 		// Turn on next LED
@@ -233,12 +242,14 @@ void sw_mode(struct timer_list *t){
 		case RED:
 			set_lights(1, 0, 0);
 			break;
+		default:
+			printk(KERN_ALERT "ERROR: unknown color\n");
 		}
 
 		// Calculate timer expiration time 
 		new_time = jiffies + norm_len[normal_color] * (HZ / cycle_rate);
 		break;
-
+	}
 	case FLASH_RED:
 		// toggle LED
 		red_state = !red_state;
@@ -278,7 +289,7 @@ static const char* mode_to_str(traffic_mode mode){
 	switch(mode) {
 		case NORMAL: return "Normal";
 		case FLASH_RED: return "Flashing-red";
-		case FLASH_YELLOW: "Flashing-yellow";
+		case FLASH_YELLOW: return "Flashing-yellow";
 		default: return "unknown state";
 	}
 }
