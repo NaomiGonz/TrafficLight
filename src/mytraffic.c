@@ -235,6 +235,7 @@ void sw_mode(struct timer_list *t){
 				norm_len[YELLOW] = 1;
 				norm_len[RED]    = 2;
 				ped_flag = false;
+			}
 			break;
 		case YELLOW:
 			set_lights(0, 1, 0);
@@ -245,7 +246,6 @@ void sw_mode(struct timer_list *t){
 		default:
 			printk(KERN_ALERT "ERROR: unknown color\n");
 		}
-
 		// Calculate timer expiration time 
 		new_time = jiffies + norm_len[normal_color] * (HZ / cycle_rate);
 		break;
@@ -277,7 +277,7 @@ void sw_mode(struct timer_list *t){
 	default:
 		printk(KERN_ALERT "ERROR: unknown mode\n");
 	}
-
+	
 	// Start the new timer
 	mod_timer(&timer, new_time);
 	spin_unlock_irqrestore(&lock, flags);
