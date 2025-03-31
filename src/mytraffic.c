@@ -288,7 +288,7 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 	char kbuf[128];
 	int written = 0;
 
-	// limit reding to avoid infinite reads
+	// limit reading to avoid infinite reads
 	if(*offset > 0) return 0;
 
 	spin_lock(&lock);
@@ -322,7 +322,7 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
 
 	spin_unlock(&lock);
 
-	copy_to_user(buffer, kbuf, written);
+	if(copy_to_user(buffer, kbuf, written)) return -EFAULT;
 
 	*offset += written;
 	return written;
@@ -333,7 +333,7 @@ static ssize_t mytraffic_write(struct file *file, const char __user *buffer, siz
 	char kbuf[10];
 	int new_rate;
 
-	copy_from_user(kbuf, buffer, len)
+	if(copy_from_user(kbuf, buffer, len)) return -EFAULT;
 
 	kbuf[len] = '\0'; // null terminate user input string
 
@@ -344,10 +344,10 @@ static ssize_t mytraffic_write(struct file *file, const char __user *buffer, siz
 			cycle_rate = new_rate;
 			spin_unlock_irqrestore(&lock, flag);
 		} else {
-			printk(KERN_ERR "invalid new cycle rate\n");
+			printk(KERN_ERR "ERROR: invalid new cycle rate\n");
 		}
 	} else {
-		printk(KERN_ERR "invalid new cycle rate\n");
+		printk(KERN_ERR "ERROR: invalid new cycle rate\n");
 	}
 
 	return len;
@@ -385,7 +385,7 @@ static int __init mytraffic_init(void){
 	// register device
 	retcheck = register_chrdev(61, "mytraffic", &fops);
 	if(retcheck < 0){
-		printk(KERN_ALERT "failed to register character device\n");
+		printk(KERN_ALERT "ERROR: failed to register character device\n");
 		return -1;
 	}
 
@@ -420,14 +420,14 @@ static int __init mytraffic_init(void){
 	retcheck = request_irq(gpio_to_irq(GPIO_BTN0), button0_isr, 
 			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "btn0", NULL);
 	if (retcheck) {
-		printk(KERN_ERR "Failed to register IRQ for BTN0\n");
+		printk(KERN_ERR "ERROR: Failed to register IRQ for BTN0\n");
 		goto irq_fail;
 	}
 
 	retcheck = request_irq(gpio_to_irq(GPIO_BTN1), button1_isr, 
 			IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING, "btn1", NULL);
 	if (retcheck) {
-		printk(KERN_ERR "Failed to register IRQ for BTN1\n");
+		printk(KERN_ERR "ERROR: Failed to register IRQ for BTN1\n");
 		free_irq(gpio_to_irq(GPIO_BTN0), NULL);
 		goto irq_fail;
 	}
@@ -530,7 +530,7 @@ module_init(mytraffic_init);
 module_exit(mytraffic_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Naomi Gonzales, Gidon Gautel");
+MODULE_AUTHOR("Naomi Gonzalez, Gidon Gautel");
 MODULE_DESCRIPTION("traffic light controller");
 
 
