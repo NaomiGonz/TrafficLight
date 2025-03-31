@@ -136,7 +136,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
     // check if button still pressed
     new_state = (gpio_get_value(GPIO_BTN0) == 0);
 
-    spin_lock_irqsave(&my_lock, flags);
+    spin_lock_irqsave(&lock, flags);
 
     // Check if both buttons are pressed
     bool old_state = button0_pressed;
@@ -198,7 +198,7 @@ static irqreturn_t button0_isr(int irq, void *dev_id){
             mod_timer(&timer, new_time);
     	}
     }
-    spin_unlock_irqrestore(&my_lock, flags);
+    spin_unlock_irqrestore(&lock, flags);
 
     return IRQ_HANDLED;
 }
