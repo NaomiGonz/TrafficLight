@@ -100,16 +100,18 @@ static void update_mode_on_buttons(void){
 // --------- BUTTON 1 interrupt ----------------
 static irqreturn_t button1_isr(int irq, void *dev_id) {
     unsigned long flags;
+    traffic_mode prev_mode;
+
     spin_lock_irqsave(&lock, flags);
 
     // Save prev mode 
-    traffic_mode prev_mode = current_mode;
+    prev_mode = current_mode;
 
     // read button value
-    button1_pressed = !gpio_get_value(GPIO_BTN1); 
+    button1_pressed = gpio_get_value(GPIO_BTN1); 
     update_mode_on_buttons();
 
-    printk(KERN_ALERT "BUTTON1_ISR- button0_pressed: %d button1_pressed: %d\n", button0_pressed, button1_pressed);
+    printk(KERN_INFO "BUTTON1_ISR- button0_pressed: %d button1_pressed: %d\n", button0_pressed, button1_pressed);
 
     // If prev mode ALL_ON => skip single-press logic
     if (prev_mode == ALL_ON && current_mode == NORMAL) {
@@ -131,17 +133,18 @@ static irqreturn_t button1_isr(int irq, void *dev_id) {
 // --------- BUTTON 0 interrupt ----------------
 static irqreturn_t button0_isr(int irq, void *dev_id){
     unsigned long flags;
+    traffic_mode prev_mode;
 
     spin_lock_irqsave(&lock, flags);
 
     // Save prev mode 
-    traffic_mode prev_mode = current_mode;
+    prev_mode = current_mode;
 
     // read button value
-    button0_pressed = !gpio_get_value(GPIO_BTN0);
+    button0_pressed = gpio_get_value(GPIO_BTN0);
     update_mode_on_buttons();
 
-    printk(KERN_ALERT "BUTTON0_ISR- button0_pressed: %d button1_pressed: %d\n", button0_pressed, button1_pressed);
+    printk(KERN_INFO "BUTTON0_ISR- button0_pressed: %d button1_pressed: %d\n", button0_pressed, button1_pressed);
 
     // If prev mode ALL_ON => skip single-press logic
     if (prev_mode == ALL_ON && current_mode == NORMAL) {
@@ -238,7 +241,7 @@ void sw_mode(struct timer_list *t){
     case ALL_ON:
         break;
     default:
-        printk(KERN_ALERT "ERROR: unknown mode\n");
+        printk(KERN_INFO "ERROR: unknown mode\n");
         // fallback
         set_lights(0, 0, 1);
         new_time = jiffies + norm_len[GREEN] * (HZ / cycle_rate);
@@ -361,7 +364,7 @@ static int __init mytraffic_init(void){
     // register device
     retcheck = register_chrdev(61, "mytraffic", &fops);
     if(retcheck < 0){
-        printk(KERN_ALERT "ERROR: failed to register character device\n");
+        printk(KERN_INFO "ERROR: failed to register character device\n");
         return -1;
     }
 
@@ -509,6 +512,11 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Naomi Gonzalez, Gidon Gautel");
 MODULE_DESCRIPTION("traffic light controller");
 
+
+// watch cat /dev/mytraffic
+// echo 2 > /dev/mytraffic
+// cat /dev/mytraffic
+// for f in 1 3 5 7 9 1; do echo $f | tee /dev/mytraffic; sleep 3; done
 
 
 
