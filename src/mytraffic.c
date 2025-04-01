@@ -298,7 +298,7 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
             yellow_state ? "on" : "off",
             gpio_get_value(GPIO_GREEN) ? "on" : "off"
         );
-        case NORMAL:
+        default:
         written += snprintf(kbuf + written, sizeof(kbuf) - written,
             "Light status: Red %s, Yellow %s, Green %s\n",
             gpio_get_value(GPIO_RED) ? "on" : "off",
