@@ -283,26 +283,30 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
             "Cycle rate: %d\n", cycle_rate);
 
     // LED status
-    written += snprintf(kbuf + written, sizeof(kbuf) - written,
-            switch(current_mode){
-                case FLASH_RED:
+    switch(current_mode){
+        case FLASH_RED:
+        written += snprintf(kbuf + written, sizeof(kbuf) - written,
                     "Light status: Red %s, Yellow %s, Green %s\n",
                     red_state ? "on" : "off",
                     gpio_get_value(GPIO_YELLOW) ? "on" : "off",
                     gpio_get_value(GPIO_GREEN) ? "on" : "off"
-                case FLASH_YELLOW:
-                    "Light status: Red %s, Yellow %s, Green %s\n",
-                    gpio_get_value(GPIO_RED) ? "on" : "off",
-                    yellow_state ? "on" : "off",
-                    gpio_get_value(GPIO_GREEN) ? "on" : "off"
-                case NORMAL:
-                    "Light status: Red %s, Yellow %s, Green %s\n",
-                    gpio_get_value(GPIO_RED) ? "on" : "off",
-                    gpio_get_value(GPIO_YELLOW) ? "on" : "off",
-                    gpio_get_value(GPIO_GREEN) ? "on" : "off"
-            }
         );
-
+        case FLASH_YELLOW:
+        written += snprintf(kbuf + written, sizeof(kbuf) - written,
+            "Light status: Red %s, Yellow %s, Green %s\n",
+            gpio_get_value(GPIO_RED) ? "on" : "off",
+            yellow_state ? "on" : "off",
+            gpio_get_value(GPIO_GREEN) ? "on" : "off"
+        );
+        case NORMAL:
+        written += snprintf(kbuf + written, sizeof(kbuf) - written,
+            "Light status: Red %s, Yellow %s, Green %s\n",
+            gpio_get_value(GPIO_RED) ? "on" : "off",
+            gpio_get_value(GPIO_YELLOW) ? "on" : "off",
+            gpio_get_value(GPIO_GREEN) ? "on" : "off"
+        );
+    }
+    
     // pedestrian waiting?
     if(ped_flag) {
         written += snprintf(kbuf + written, sizeof(kbuf) - written,
