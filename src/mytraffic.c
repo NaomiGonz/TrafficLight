@@ -290,21 +290,21 @@ static ssize_t mytraffic_read(struct file *file, char __user *buffer, size_t len
                     red_state ? "on" : "off",
                     gpio_get_value(GPIO_YELLOW) ? "on" : "off",
                     gpio_get_value(GPIO_GREEN) ? "on" : "off"
-        );
+        ); break;
         case FLASH_YELLOW:
         written += snprintf(kbuf + written, sizeof(kbuf) - written,
             "Light status: Red %s, Yellow %s, Green %s\n",
             gpio_get_value(GPIO_RED) ? "on" : "off",
             yellow_state ? "on" : "off",
             gpio_get_value(GPIO_GREEN) ? "on" : "off"
-        );
+        ); break;
         default:
         written += snprintf(kbuf + written, sizeof(kbuf) - written,
             "Light status: Red %s, Yellow %s, Green %s\n",
             gpio_get_value(GPIO_RED) ? "on" : "off",
             gpio_get_value(GPIO_YELLOW) ? "on" : "off",
             gpio_get_value(GPIO_GREEN) ? "on" : "off"
-        );
+        ); break;
     }
     
     // pedestrian waiting?
