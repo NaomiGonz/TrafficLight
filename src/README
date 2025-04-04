@@ -1,0 +1,5 @@
+Gidon Gautel gautelg@bu.edu, Naomi Gonzalez ngonzalz@bu.edu
+
+GPIO in the kernel: an introduction: https://lwn.net/Articles/532714/
+The Linux Kernel API: https://www.kernel.org/doc/html/v5.6/core-api/kernel-api.html
+Linux generic IRQ handling: https://www.kernel.org/doc/html/v5.6/core-api/genericirq.html#c.request_irq
